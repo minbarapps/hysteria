@@ -226,7 +226,6 @@ sed -i "s|DBNAME|$DBNAME|g" /etc/openvpn/login/config.sh
 . /etc/openvpn/login/config.sh
 Query="SELECT user_name FROM users WHERE user_name='$username' AND auth_vpn=md5('$password') AND is_freeze='0' AND duration > 0"
 user_name=`mysql -u $USER -p$PASS -D $DB -h $HOST -sN -e "$Query"`
-[ "$user_name" != '' ] && [ "$user_name" = "$username" ] && echo "user : $username" && echo 'authentication ok.' && exit 0 || echo 'authentication failed.'; exit 1
 EOM
 
 #client-connect file
@@ -538,7 +537,6 @@ PASSWORD=$(echo "$AUTH" | cut -d ":" -f 2)
 
 Query="SELECT user_name FROM users WHERE user_name='$USERNAME' AND auth_vpn=md5('$PASSWORD') AND is_freeze='0' AND duration > 0"
 username=`mysql -u $USER -p$PASS -D $DB -h $HOST -sN -e "$Query"`
-[ "$username" != '' ] && [ "$username" = "$USERNAME" ] && echo "user : $username" && echo 'authentication ok.' && exit 0 || echo 'Authentication failed.'; exit 1
 EOM
 
 chmod 755 /etc/hysteria/config.yaml
