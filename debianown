@@ -9,6 +9,9 @@ DB_PASSWORD='dx8qLn2WOqz7'
 # Update package lists
 apt-get update
 
+# Install screen
+apt-get install -y screen
+
 # Install OpenVPN and MySQL client
 apt-get install -y openvpn mariadb-client
 
