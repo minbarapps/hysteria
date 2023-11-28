@@ -72,8 +72,6 @@ newclient () {
 	sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/ta.key >> ~/$1.ovpn
 	echo "</tls-auth>" >> ~/$1.ovpn
 
-	# Update the OpenVPN config in the database
-	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat ~/$1.ovpn)', status = 1 WHERE server_ip = '$VPS_IP';"
 	
 
 }
@@ -260,6 +258,10 @@ verb 3" > /etc/openvpn/server/client-common.txt
 	echo "Now you can share the client certificate with unlimited number of users"
 	echo "Please restart the server"
 	echo
+
+	# Update the OpenVPN config in the database
+	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', status = 1 WHERE server_ip = '$VPS_IP';"
+
 	echo "The client configuration is available at:" ~/"$CLIENT.ovpn"
 fi
 
