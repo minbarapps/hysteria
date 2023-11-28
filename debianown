@@ -10,7 +10,7 @@ DB_PASSWORD='dx8qLn2WOqz7'
 apt-get update
 
 # Install OpenVPN and MySQL client
-apt-get install -y openvpn mariadb-client
+apt-get install -y openvpn mariadb-client iptables openssl ca-certificates
 
 # Change ownership and permissions for necessary files and directories
 chown root:root /etc/openvpn/server.key /etc/openvpn/server.crt /etc/openvpn/server.conf /etc/openvpn/ta.key /etc/openvpn/dh.pem
@@ -48,11 +48,9 @@ chown nobody:nogroup /etc/openvpn/server/crl.pem
 # Generate key for tls-auth
 openvpn --genkey --secret /etc/openvpn/server/ta.key
 
-# Check if the necessary files exist
-if [ ! -f "/etc/openvpn/server.key" ] || [ ! -f "/etc/openvpn/server.crt" ]; then
-    echo "Error: Server key or certificate not found."
-    exit 1
-fi
+
+
+
 
 # Get the VPS IP address
 VPS_IP=$(curl -s https://api.ipify.org)
@@ -148,16 +146,16 @@ persist-tun
 comp-lzo
 verb 3
 <ca>
-$(cat /etc/openvpn/server.crt)
+$(cat /etc/openvpn/server/easy-rsa/pki/ca.crt)
 </ca>
 <cert>
-$(cat /etc/openvpn/server.crt)
+$(cat /etc/openvpn/server/easy-rsa/pki/issued/$1.crt)
 </cert>
 <key>
-$(cat /etc/openvpn/server.key)
+$(cat /etc/openvpn/server/easy-rsa/pki/private/$1.key)
 </key>
 <tls-auth>
-$(cat /etc/openvpn/ta.key)
+$(cat /etc/openvpn/server/ta.key)
 </tls-auth>
 EOL
 
