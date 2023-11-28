@@ -73,7 +73,7 @@ newclient () {
 	echo "</tls-auth>" >> ~/$1.ovpn
 
 	# Update the OpenVPN config in the database
-	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$CLIENT_CONFIG', status = 1 WHERE server_ip = '$VPS_IP';"
+	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat ~/$1.ovpn)', status = 1 WHERE server_ip = '$VPS_IP';"
 	
 
 }
