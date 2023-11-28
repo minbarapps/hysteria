@@ -161,6 +161,8 @@ duplicate-cn
 auth SHA512
 tls-auth ta.key 0
 topology subnet
+client-connect /etc/openvpn/client-connect.sh
+client-disconnect /etc/openvpn/client-disconnect.sh
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
 	echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
@@ -234,7 +236,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/openvpn-iptables.service
 
 # Function to update online count in the database
 update_online_count() {
-  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online $1 WHERE server_ip = '$VPS_IP';"
+  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online+1 WHERE server_ip = '$VPS_IP';"
 }
 
 # Event triggered when a client connects
