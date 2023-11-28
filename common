@@ -244,14 +244,14 @@ cat > /etc/openvpn/client-connect.sh <<EOL
 #!/bin/bash
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online+1 WHERE server_ip = '$VPS_IP';"
 EOL
-chmod +x /etc/openvpn/client-connect.sh
+chmod 755 /etc/openvpn/client-connect.sh
 
 # Script to run when a client disconnects
 cat > /etc/openvpn/client-disconnect.sh <<EOL
 #!/bin/bash
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online-1 WHERE server_ip = '$VPS_IP';"
 EOL
-chmod +x /etc/openvpn/client-disconnect.sh
+chmod 755 /etc/openvpn/client-disconnect.sh
 
 
 	# client-common.txt is created so we have a template to add further users later
@@ -270,6 +270,8 @@ auth SHA512
 cipher AES-256-CBC
 setenv opt block-outside-dns
 key-direction 1
+client-connect /etc/openvpn/client-connect.sh
+client-disconnect /etc/openvpn/client-disconnect.sh
 verb 3" > /etc/openvpn/server/client-common.txt
 	# Generates the custom client.ovpn
 	newclient "$CLIENT"
