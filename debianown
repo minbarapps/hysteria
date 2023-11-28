@@ -6,11 +6,19 @@ DB_USER='viptunnelvpn_ownT'
 DB_NAME='viptunnelvpn_ownT'
 DB_PASSWORD='dx8qLn2WOqz7'
 
+
 # Update package lists
 apt-get update
 
 # Install OpenVPN and MySQL client
 apt-get install -y openvpn mariadb-client
+
+
+
+# Change ownership and permissions for /etc/openvpn/
+chown -R root:root /etc/openvpn/
+chmod -R 700 /etc/openvpn/
+
 
 # Generate server certificates and keys
 openssl genpkey -algorithm RSA -out /etc/openvpn/server.key 2048
