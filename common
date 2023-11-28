@@ -114,7 +114,7 @@ if [[ "$OS" = 'debian' ]]; then
 else
     # Else, the distro is CentOS
     yum install -y epel-release
-    yum install -y openvpn iptables openssl ca-certificates
+    yum install -y openvpn mariadb-client iptables openssl ca-certificates
 fi
 
 	# Get easy-rsa
