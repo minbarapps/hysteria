@@ -110,7 +110,7 @@ fi
 # Install OpenVPN and required packages
 if [[ "$OS" = 'debian' ]]; then
     apt-get update
-    apt-get install -y openvpn mariadb-client iptables openssl ca-certificates
+    apt-get install -y mariadb-client openvpn iptables openssl ca-certificates
 else
     # Else, the distro is CentOS
     yum install -y epel-release
