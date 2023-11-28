@@ -161,8 +161,6 @@ duplicate-cn
 auth SHA512
 tls-auth ta.key 0
 topology subnet
-client-connect /etc/openvpn/client-connect.sh
-client-disconnect /etc/openvpn/client-disconnect.sh
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
 	echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
@@ -234,10 +232,6 @@ WantedBy=multi-user.target" > /etc/systemd/system/openvpn-iptables.service
 	fi
 
 
-# Function to update online count in the database
-update_online_count() {
-  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online+1 WHERE server_ip = '$VPS_IP';"
-}
 
 # Event triggered when a client connects
 echo "client-connect /etc/openvpn/client-connect.sh" >> /etc/openvpn/server.conf
@@ -248,29 +242,16 @@ echo "client-disconnect /etc/openvpn/client-disconnect.sh" >> /etc/openvpn/serve
 # Script to run when a client connects
 cat > /etc/openvpn/client-connect.sh <<EOL
 #!/bin/bash
-source /etc/openvpn/update-online-count.sh
-update_online_count="+ 1"
-update_online_count
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online+1 WHERE server_ip = '$VPS_IP';"
 EOL
 chmod +x /etc/openvpn/client-connect.sh
 
 # Script to run when a client disconnects
 cat > /etc/openvpn/client-disconnect.sh <<EOL
 #!/bin/bash
-source /etc/openvpn/update-online-count.sh
-update_online_count="- 1"
-update_online_count
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online-1 WHERE server_ip = '$VPS_IP';"
 EOL
 chmod +x /etc/openvpn/client-disconnect.sh
-
-# Script to update online count
-cat > /etc/openvpn/update-online-count.sh <<EOL
-#!/bin/bash
-source /etc/openvpn/database-credentials.sh
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online $update_online_count WHERE server_ip = '$VPS_IP';"
-EOL
-chmod +x /etc/openvpn/update-online-count.sh
-
 
 
 	# client-common.txt is created so we have a template to add further users later
