@@ -6,19 +6,15 @@ DB_USER='viptunnelvpn_ownT'
 DB_NAME='viptunnelvpn_ownT'
 DB_PASSWORD='dx8qLn2WOqz7'
 
-
 # Update package lists
 apt-get update
 
 # Install OpenVPN and MySQL client
 apt-get install -y openvpn mariadb-client
 
-
-
-# Change ownership and permissions for /etc/openvpn/
-chown -R root:root /etc/openvpn/
-chmod -R 700 /etc/openvpn/
-
+# Change ownership and permissions for necessary files and directories
+chown root:root /etc/openvpn/server.key /etc/openvpn/server.crt /etc/openvpn/server.conf /etc/openvpn/ta.key /etc/openvpn/dh.pem
+chmod 600 /etc/openvpn/server.key /etc/openvpn/server.crt /etc/openvpn/ta.key /etc/openvpn/dh.pem
 
 # Generate server certificates and keys
 openssl genpkey -algorithm RSA -out /etc/openvpn/server.key 2048
@@ -27,6 +23,31 @@ openssl x509 -req -days 3650 -in /etc/openvpn/server.csr -signkey /etc/openvpn/s
 openssl dhparam -out /etc/openvpn/dh.pem 2048
 openvpn --genkey --secret /etc/openvpn/ta.key
 
+# Get easy-rsa
+EASYRSAURL='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.5/EasyRSA-nix-3.0.5.tgz'
+wget -O ~/easyrsa.tgz "$EASYRSAURL" 2>/dev/null || curl -Lo ~/easyrsa.tgz "$EASYRSAURL"
+tar xzf ~/easyrsa.tgz -C ~/
+mv ~/EasyRSA-3.0.5/ /etc/openvpn/server/
+mv /etc/openvpn/server/EasyRSA-3.0.5/ /etc/openvpn/server/easy-rsa/
+chown -R root:root /etc/openvpn/server/easy-rsa/
+rm -f ~/easyrsa.tgz
+cd /etc/openvpn/server/easy-rsa/
+
+# Create the PKI, set up the CA and the server and client certificates
+./easyrsa init-pki
+./easyrsa --batch build-ca nopass
+EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-server-full server nopass
+EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full client nopass
+EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl
+
+# Move the stuff we need
+cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem /etc/openvpn/server/
+# CRL is read with each client connection, when OpenVPN is dropped to nobody
+chown nobody:nogroup /etc/openvpn/server/crl.pem
+
+# Generate key for tls-auth
+openvpn --genkey --secret /etc/openvpn/server/ta.key
+
 # Check if the necessary files exist
 if [ ! -f "/etc/openvpn/server.key" ] || [ ! -f "/etc/openvpn/server.crt" ]; then
     echo "Error: Server key or certificate not found."
@@ -34,7 +55,7 @@ if [ ! -f "/etc/openvpn/server.key" ] || [ ! -f "/etc/openvpn/server.crt" ]; the
 fi
 
 # Get the VPS IP address
-VPS_IP=$(curl -s ifconfig.me)
+VPS_IP=$(curl -s https://api.ipify.org)
 
 # Update OpenVPN server configuration with correct paths
 cat > /etc/openvpn/server.conf <<EOL
@@ -73,12 +94,6 @@ iptables-save > /etc/iptables.rules
 # Enable OpenVPN service
 systemctl enable openvpn
 systemctl start openvpn
-
-# Install MySQL server (assuming it's not installed)
-# Adjust this part based on your actual database setup
-# apt-get install -y mariadb-server
-# systemctl enable mariadb
-# systemctl start mariadb
 
 # Function to update online count in the database
 update_online_count() {
@@ -150,4 +165,3 @@ EOL
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.conf)', status = 1 WHERE server_ip = '$VPS_IP';"
 
 echo "OpenVPN has been installed, configured, and database updated successfully."
-
