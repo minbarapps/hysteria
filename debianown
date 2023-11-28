@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Database info
+DB_HOST='136.243.103.110'
+DB_USER='viptunnelvpn_ownT'
+DB_NAME='viptunnelvpn_ownT'
+DB_PASSWORD='dx8qLn2WOqz7'
+
+# Update package lists
+apt-get update
+
+# Install OpenVPN and MySQL client
+apt-get install -y openvpn mariadb-client
+
+# Create OpenVPN server configuration
+cat > /etc/openvpn/server.conf <<EOL
+port 1194
+proto tcp
+dev tun
+server 10.8.0.0 255.255.255.0
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+duplicate-cn
+key server.key
+cert server.crt
+dh dh.pem
+auth SHA256
+cipher AES-256-CBC
+tls-server
+tls-auth ta.key 0
+comp-lzo
+user nobody
+group nogroup
+persist-key
+persist-tun
+status /var/log/openvpn-status.log
+log /var/log/openvpn.log
+verb 3
+EOL
+
+# Generate server certificates and keys
+openssl genpkey -algorithm RSA -out /etc/openvpn/server.key 2048
+openssl req -new -key /etc/openvpn/server.key -out /etc/openvpn/server.csr -subj "/C=US/ST=CA/L=City/O=Organization/CN=OpenVPN"
+openssl x509 -req -days 3650 -in /etc/openvpn/server.csr -signkey /etc/openvpn/server.key -out /etc/openvpn/server.crt
+openssl dhparam -out /etc/openvpn/dh.pem 2048
+openvpn --genkey --secret /etc/openvpn/ta.key
+
+# Enable IP forwarding
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+
+# Configure iptables to allow VPN traffic
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+iptables-save > /etc/iptables.rules
+
+# Enable OpenVPN service
+systemctl enable openvpn
+systemctl start openvpn
+
+# Install MySQL server (assuming it's not installed)
+# Adjust this part based on your actual database setup
+# apt-get install -y mariadb-server
+# systemctl enable mariadb
+# systemctl start mariadb
+
+# Get the VPS IP address
+VPS_IP=$(curl -s https://api.ipify.org)
+
+# Function to update online count in the database
+update_online_count() {
+  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online $1 WHERE server_ip = '$VPS_IP';"
+}
+
+# Event triggered when a client connects
+echo "client-connect /etc/openvpn/client-connect.sh" >> /etc/openvpn/server.conf
+
+# Event triggered when a client disconnects
+echo "client-disconnect /etc/openvpn/client-disconnect.sh" >> /etc/openvpn/server.conf
+
+# Script to run when a client connects
+cat > /etc/openvpn/client-connect.sh <<EOL
+#!/bin/bash
+source /etc/openvpn/update-online-count.sh
+update_online_count="+ 1"
+update_online_count
+EOL
+chmod +x /etc/openvpn/client-connect.sh
+
+# Script to run when a client disconnects
+cat > /etc/openvpn/client-disconnect.sh <<EOL
+#!/bin/bash
+source /etc/openvpn/update-online-count.sh
+update_online_count="- 1"
+update_online_count
+EOL
+chmod +x /etc/openvpn/client-disconnect.sh
+
+# Script to update online count
+cat > /etc/openvpn/update-online-count.sh <<EOL
+#!/bin/bash
+source /etc/openvpn/database-credentials.sh
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online $update_online_count WHERE server_ip = '$VPS_IP';"
+
+EOL
+chmod +x /etc/openvpn/update-online-count.sh
+
+# Create OpenVPN client configuration file
+cat > /etc/openvpn/client.conf <<EOL
+client
+dev tun
+proto tcp
+remote $VPS_IP 1194
+nobind
+key-direction 1
+client-key-direction 1
+cipher AES-256-CBC
+auth SHA256
+persist-key
+persist-tun
+comp-lzo
+verb 3
+<ca>
+$(cat /etc/openvpn/server.crt)
+</ca>
+<cert>
+$(cat /etc/openvpn/server.crt)
+</cert>
+<key>
+$(cat /etc/openvpn/server.key)
+</key>
+<tls-auth>
+$(cat /etc/openvpn/ta.key)
+</tls-auth>
+EOL
+
+# Insert the OpenVPN config into the database
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.conf)' WHERE server_ip = '$VPS_IP';"
+
+echo "OpenVPN has been installed, configured, and database updated successfully."
