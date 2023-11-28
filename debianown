@@ -63,6 +63,7 @@ systemctl start openvpn
 # systemctl enable mariadb
 # systemctl start mariadb
 
+
 # Get the VPS IP address
 VPS_IP=$(curl -s https://api.ipify.org)
 
@@ -100,7 +101,6 @@ cat > /etc/openvpn/update-online-count.sh <<EOL
 #!/bin/bash
 source /etc/openvpn/database-credentials.sh
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET online = online $update_online_count WHERE server_ip = '$VPS_IP';"
-
 EOL
 chmod +x /etc/openvpn/update-online-count.sh
 
@@ -133,7 +133,10 @@ $(cat /etc/openvpn/ta.key)
 </tls-auth>
 EOL
 
-# Insert the OpenVPN config into the database
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.conf)' WHERE server_ip = '$VPS_IP';"
+# Update the OpenVPN config in the database
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.conf)', status = 1 WHERE server_ip = '$VPS_IP';"
 
 echo "OpenVPN has been installed, configured, and database updated successfully."
+
+
+
