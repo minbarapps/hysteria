@@ -9,9 +9,24 @@ DB_PASSWORD='dx8qLn2WOqz7'
 # Update package lists
 apt-get update
 
-
 # Install OpenVPN and MySQL client
 apt-get install -y openvpn mariadb-client
+
+# Generate server certificates and keys
+openssl genpkey -algorithm RSA -out /etc/openvpn/server.key 2048
+openssl req -new -key /etc/openvpn/server.key -out /etc/openvpn/server.csr -subj "/C=US/ST=CA/L=City/O=Organization/CN=OpenVPN"
+openssl x509 -req -days 3650 -in /etc/openvpn/server.csr -signkey /etc/openvpn/server.key -out /etc/openvpn/server.crt
+openssl dhparam -out /etc/openvpn/dh.pem 2048
+openvpn --genkey --secret /etc/openvpn/ta.key
+
+# Check if the necessary files exist
+if [ ! -f "/etc/openvpn/server.key" ] || [ ! -f "/etc/openvpn/server.crt" ]; then
+    echo "Error: Server key or certificate not found."
+    exit 1
+fi
+
+# Get the VPS IP address
+VPS_IP=$(curl -s ifconfig.me)
 
 # Update OpenVPN server configuration with correct paths
 cat > /etc/openvpn/server.conf <<EOL
@@ -39,19 +54,6 @@ log /var/log/openvpn.log
 verb 3
 EOL
 
-# Generate server certificates and keys
-openssl genpkey -algorithm RSA -out /etc/openvpn/server.key 2048
-openssl req -new -key /etc/openvpn/server.key -out /etc/openvpn/server.csr -subj "/C=US/ST=CA/L=City/O=Organization/CN=OpenVPN"
-openssl x509 -req -days 3650 -in /etc/openvpn/server.csr -signkey /etc/openvpn/server.key -out /etc/openvpn/server.crt
-openssl dhparam -out /etc/openvpn/dh.pem 2048
-openvpn --genkey --secret /etc/openvpn/ta.key
-
-# Check if the necessary files exist
-if [ ! -f "/etc/openvpn/server.key" ] || [ ! -f "/etc/openvpn/server.crt" ]; then
-    echo "Error: Server key or certificate not found."
-    exit 1
-fi
-
 # Enable IP forwarding
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 sysctl -p
@@ -69,10 +71,6 @@ systemctl start openvpn
 # apt-get install -y mariadb-server
 # systemctl enable mariadb
 # systemctl start mariadb
-
-
-# Get the VPS IP address
-VPS_IP=$(curl -s https://api.ipify.org)
 
 # Function to update online count in the database
 update_online_count() {
@@ -144,6 +142,4 @@ EOL
 mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.conf)', status = 1 WHERE server_ip = '$VPS_IP';"
 
 echo "OpenVPN has been installed, configured, and database updated successfully."
-
-
 
