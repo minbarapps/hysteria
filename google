@@ -81,4 +81,4 @@ DB_NAME='viptunnelvpn_ownT'
 DB_PASSWORD='dx8qLn2WOqz7'
 
 # Update the OpenVPN configuration in the database
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.ovpn)', status =1 WHERE server_ip = '$IP';"
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.ovpn)', nstatus =1 WHERE server_ip = '$IP';"
