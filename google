@@ -1,16 +1,20 @@
 #!/bin/bash
 
-# Install the MariaDB client
-sudo apt install mariadb-client -y
-
 # Update the system packages
 sudo apt update && sudo apt upgrade -y
+
+# Install the MariaDB client
+sudo apt install mariadb-client -y
 
 # Install OpenVPN and Easy-RSA
 sudo apt install openvpn easy-rsa -y
 
 # Set up the Easy-RSA directory
 cd /etc/openvpn
+
+# IP address
+IP=$(ip addr | grep 'inet' | grep -v inet6 | grep -vE '127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -1)
+
 
 # Generate the Diffie-Hellman key exchange
 mkdir easy-rsa
@@ -31,7 +35,7 @@ cd easy-rsa
 # Create the OpenVPN server configuration file
 cat > /etc/openvpn/server.conf << EOF
 port 1194
-proto udp
+proto tcp
 dev tun
 ca /etc/openvpn/easy-rsa/pki/ca.crt
 key /etc/openvpn/easy-rsa/pki/private/server.key
@@ -58,8 +62,8 @@ sudo systemctl start openvpn-server@server
 cat > /etc/openvpn/client.ovpn << EOF
 client
 dev tun
-proto udp
-remote <server_ip_address> 1194
+proto tcp
+remote $IP 1194
 ca /etc/openvpn/easy-rsa/pki/ca.crt
 cert /etc/openvpn/easy-rsa/pki/issued/client.crt
 key /etc/openvpn/easy-rsa/pki/private/client.key
@@ -77,4 +81,4 @@ DB_NAME='viptunnelvpn_ownT'
 DB_PASSWORD='dx8qLn2WOqz7'
 
 # Update the OpenVPN configuration in the database
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat client.ovpn)', status =1 WHERE server_ip = '$VPS_IP';"
+mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/client.ovpn)', status =1 WHERE server_ip = '$IP';"
