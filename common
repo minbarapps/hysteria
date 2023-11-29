@@ -289,7 +289,7 @@ verb 3" > /etc/openvpn/server/client-common.txt
 
 
 	# Update the OpenVPN config in the database
-	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', status =1 WHERE server_ip = '$VPS_IP';"
+	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', nstatus =1 WHERE server_ip = '$VPS_IP';"
 	systemctl restart openvpn-server@server
 	echo "The client configuration is available at:" ~/"$CLIENT.ovpn"
 fi
