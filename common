@@ -166,12 +166,12 @@ client-disconnect /etc/openvpn/client-disconnect.sh
 log /etc/openvpn/server/tcpserver.log
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
-	echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
+echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
 	
 # Set default DNS values
 DNS_1="8.8.8.8"
 DNS_2="8.8.4.4"
-	echo "keepalive 10 120
+echo "keepalive 10 120
 cipher AES-256-CBC
 user nobody
 group $GROUPNAME
