@@ -119,6 +119,28 @@ mkdir -p /etc/openvpn/server
 mkdir -p /var/www/html/stat
 touch /etc/openvpn/server2.conf
 
+# client-common.txt is created so we have a template to add further users later
+echo "client
+dev tun
+proto $PROTOCOL
+sndbuf 0
+rcvbuf 0
+remote $IP $PORT
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+auth SHA512
+cipher AES-256-CBC
+setenv opt block-outside-dns
+key-direction 1
+verb 3" > /etc/openvpn/server/client-common.txt
+
+
+
+
+
 
 # Get easy-rsa
 	EASYRSAURL='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.5/EasyRSA-nix-3.0.5.tgz'
@@ -204,7 +226,11 @@ status-version 2
 verb 3' > /etc/openvpn/server2.conf
 
 
-mysql -h "$HOST" -u "$USER" -p"$PASS" "$DBNAME" -e "UPDATE server_list SET config = '$(cat /etc/openvpn/server2.conf)', nstatus =1 WHERE server_ip = '$server_ip';"
+
+CLIENT="server1"
+newclient "$CLIENT"
+
+mysql -h "$HOST" -u "$USER" -p"$PASS" "$DBNAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', nstatus =1 WHERE server_ip = '$server_ip';"
 	
 
 
@@ -261,6 +287,30 @@ chmod 755 /etc/openvpn/login/config.sh
 
 }&>/dev/null
 }
+
+
+
+newclient () {
+	# Generates the custom client.ovpn
+	cp /etc/openvpn/server/client-common.txt ~/$1.ovpn
+	echo "<ca>" >> ~/$1.ovpn
+	cat /etc/openvpn/server/easy-rsa/pki/ca.crt >> ~/$1.ovpn
+	echo "</ca>" >> ~/$1.ovpn
+	echo "<cert>" >> ~/$1.ovpn
+	sed -ne '/BEGIN CERTIFICATE/,$ p' /etc/openvpn/server/easy-rsa/pki/issued/$1.crt >> ~/$1.ovpn
+	echo "</cert>" >> ~/$1.ovpn
+	echo "<key>" >> ~/$1.ovpn
+	cat /etc/openvpn/server/easy-rsa/pki/private/$1.key >> ~/$1.ovpn
+	echo "</key>" >> ~/$1.ovpn
+	echo "<tls-auth>" >> ~/$1.ovpn
+	sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/ta.key >> ~/$1.ovpn
+	echo "</tls-auth>" >> ~/$1.ovpn
+
+	
+
+}
+
+
 
 
 install_firewall_kvm () {
