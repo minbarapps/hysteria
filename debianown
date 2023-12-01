@@ -122,10 +122,10 @@ touch /etc/openvpn/server2.conf
 # client-common.txt is created so we have a template to add further users later
 echo "client
 dev tun
-proto $PROTOCOL
+proto tcp
 sndbuf 0
 rcvbuf 0
-remote $IP $PORT
+remote $server_ip $PORT_TCP
 resolv-retry infinite
 nobind
 persist-key
