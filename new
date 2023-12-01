@@ -5,11 +5,6 @@ DB_USER='viptunnelvpn_ownT'
 DB_PASS='dx8qLn2WOqz7'
 DB_NAME='viptunnelvpn_ownT'
 
-
-# Get the VPS IP address
-VPS_IP=$(curl -s https://api.ipify.org)
-
-
 # https://github.com/xoventechdev/openvpn-install-for-multiple-users
 # This script enables duplicate-cn in server.conf. You can share the same client.ovpn file for multiple users.
 # Based on Nyr https://github.com/Nyr/openvpn-install
@@ -67,6 +62,9 @@ newclient () {
 	echo "<tls-auth>" >> ~/$1.ovpn
 	sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/ta.key >> ~/$1.ovpn
 	echo "</tls-auth>" >> ~/$1.ovpn
+ 	CLIENT_CONFIG=$(cat ~/$1.ovpn)
+    mysql -h $DB_HOST -u $DB_USER -p$DB_PASS $DB_NAME -e "UPDATE server_list SET config='$CLIENT_CONFIG' WHERE server_ip='$IP'"
+
 }
 
 if [[ -e /etc/openvpn/server/server.conf ]]; then
@@ -103,11 +101,11 @@ fi
 # Install OpenVPN and required packages
 if [[ "$OS" = 'debian' ]]; then
     apt-get update
-    apt-get install -y mariadb-client openvpn iptables openssl ca-certificates
+    apt-get install -y openvpn mariadb-client iptables openssl ca-certificates
 else
     # Else, the distro is CentOS
     yum install -y epel-release
-    yum install -y mariadb-client openvpn iptables openssl ca-certificates
+    yum install -y openvpn mariadb-client iptables openssl ca-certificates
 fi
 
 	# Get easy-rsa
@@ -251,10 +249,5 @@ verb 3" > /etc/openvpn/server/client-common.txt
 	echo "Now you can share the client certificate with unlimited number of users"
 	echo "Please restart the server"
 	echo
-
-mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', nstatus =1 WHERE server_ip = '$VPS_IP';"
-
-
-
 	echo "The client configuration is available at:" ~/"$CLIENT.ovpn"
 fi
