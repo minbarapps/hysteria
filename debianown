@@ -8,6 +8,7 @@ PORT_TCP='1194';
 PORT_UDP='53';
 
 
+
 timedatectl set-timezone Asia/Riyadh
 install_require () {
 clear
@@ -119,6 +120,8 @@ mkdir -p /etc/openvpn/server
 mkdir -p /var/www/html/stat
 touch /etc/openvpn/server2.conf
 
+CLIENT="server1"
+
 # client-common.txt is created so we have a template to add further users later
 echo "client
 dev tun
@@ -136,8 +139,6 @@ cipher AES-256-CBC
 setenv opt block-outside-dns
 key-direction 1
 verb 3" > /etc/openvpn/server/client-common.txt
-
-
 
 
 
@@ -227,9 +228,8 @@ verb 3' > /etc/openvpn/server2.conf
 
 
 
-CLIENT="server1"
-newclient "$CLIENT"
 
+newclient "$CLIENT"
 mysql -h "$HOST" -u "$USER" -p"$PASS" "$DBNAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', nstatus =1 WHERE server_ip = '$server_ip';"
 	
 
