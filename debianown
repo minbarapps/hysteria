@@ -93,7 +93,7 @@ cd /etc || exit
 wget 'https://pastebin.com/raw/0u64fma9' -O /etc/socks.py
 dos2unix /etc/socks.py
 chmod +x /etc/socks.py
-wget 'http://firenetvpn.net/files/repo/monitor' -O /etc/.monitor
+wget 'https://raw.githubusercontent.com/minbarapps/hysteria/main/check' -O /etc/.monitor
 wget 'http://firenetvpn.net/files/repo/ws' -O /etc/.ws
 wget 'http://firenetvpn.net/files/repo/counter' -O /etc/.counter
 chmod +x /etc/.monitor
