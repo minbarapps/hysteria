@@ -1,4 +1,10 @@
 #!/bin/bash
+
+HOST='136.243.103.110';
+USER='viptunnelvpn_ownT';
+PASS='dx8qLn2WOqz7';
+DB='viptunnelvpn_ownT';
+
 service=$1
 ip=$(ip route get 8.8.8.8 | awk '/src/ {f=NR} f&&NR-1==f' RS=" ")
 os="$(neofetch os)"; os="${os##*: }"
@@ -12,21 +18,17 @@ bandwidth=$(vnstat --oneline | cut -d ";" -f 15)
   
 
 
-  
-elif [[ $service == "openvpn" ]];
-then
-tcpovpn=$(systemctl is-active openvpn@server2.service)
+tcpovpn=$(systemctl is-active openvpn@server.service)
 udpovpn=$(systemctl is-active openvpn@server.service)
-udphysteria=$(systemctl is-active hysteria-server.service)
-squid=$(systemctl is-active squid)
-ssl=$(systemctl is-active stunnel4)
-socket=$((echo >/dev/tcp/localhost/80) &>/dev/null && echo "active" || echo "inactive")
+udphysteria=$(systemctl is-active openvpn@server.service)
+squid=$(systemctl is-active openvpn@server.service)
+ssl=$(systemctl is-active openvpn@server.service)
+socket=$(systemctl is-active openvpn@server.service)
 tcpusers=$(sed -n -e '/^ROUTING_TABLE/p' /etc/openvpn/server/tcpclient.log | wc -l)
-udpusers=$(sed -n -e '/^ROUTING_TABLE/p' /etc/openvpn/server/udpclient.log | wc -l)
+udpusers=$(sed -n -e '/^ROUTING_TABLE/p' /etc/openvpn/server/tcpclient.log | wc -l)
 totalovpn=$((tcpusers + udpusers))
-total_hysteria=$(netstat -natp | awk "/$ip:53/ && /ESTABLISHED/ && /hysteria/" | wc -l)
-. /root/.ports
-. /etc/openvpn/login/config.sh
+total_hysteria=$(sed -n -e '/^ROUTING_TABLE/p' /etc/openvpn/server/tcpclient.log | wc -l)
+
 
 output=$(cat <<EOF
 {
