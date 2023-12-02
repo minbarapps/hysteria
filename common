@@ -19,6 +19,7 @@ wget 'https://raw.githubusercontent.com/minbarapps/hysteria/main/check' -O /etc/
 chmod +x /etc/.monitor
 apt install -y curl wget cron python-minimal libpython-stdlib netcat httpie php neofetch vnstat
 
+sudo service vnstat start
 
 
 
