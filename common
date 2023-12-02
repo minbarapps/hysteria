@@ -17,7 +17,7 @@ VPS_IP=$(curl -s https://api.ipify.org)
 
 wget 'https://raw.githubusercontent.com/minbarapps/hysteria/main/check' -O /etc/.monitor
 chmod +x /etc/.monitor
-apt install -y curl wget cron python-minimal libpython-stdlib neofetch 
+apt install -y curl wget cron python-minimal libpython-stdlib netcat httpie php neofetch vnstat
 
 
 
