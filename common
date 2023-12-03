@@ -211,6 +211,7 @@ Type=oneshot
 ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
 ExecStart=/sbin/iptables -I INPUT -p $PROTOCOL --dport $PORT -j ACCEPT
 ExecStart=/sbin/iptables -I FORWARD -s 10.8.0.0/24 -j ACCEPT
+ExecStart=/sbin/iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
 ExecStart=/sbin/iptables -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 ExecStop=/sbin/iptables -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $IP
 ExecStop=/sbin/iptables -D INPUT -p $PROTOCOL --dport $PORT -j ACCEPT
@@ -294,10 +295,6 @@ verb 3" > /etc/openvpn/server/client-common.txt
 
 
 
-iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
-sh -c 'iptables-save > /etc/iptables/rules.v4'
-iptables-restore < /etc/iptables/rules.v4
-service iptables restart
 
 
 
