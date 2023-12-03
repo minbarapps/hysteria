@@ -7,14 +7,26 @@ DB='viptunnelvpn_ownT';
 
 service=$1
 ip=$(ip route get 8.8.8.8 | awk '/src/ {f=NR} f&&NR-1==f' RS=" ")
-os=$(lsb_release -ds)
-distro=$(lsb_release -cs)
-cpu=$(lscpu | grep "Model name" | awk -F ':' '{print $2}' | sed 's/^[ \t]*//')
-memory=$(free -h | awk '/^Mem:/ {print $2}')
-disk=$(df -h / | awk 'NR==2 {print $2}')
-uptime=$(uptime -p)
-bandwidth=$(vnstat --oneline | cut -d ";" -f 15)
 
+
+# Full paths to binaries
+NEOFETCH="/usr/bin/neofetch"
+VNSTAT="/usr/bin/vnstat"
+
+# Check if binaries exist
+if [ ! -x "$NEOFETCH" ] || [ ! -x "$VNSTAT" ]; then
+    echo "Error: neofetch or vnstat not found. Make sure they are installed and in your PATH."
+    exit 1
+fi
+
+# Get system information
+os="$($NEOFETCH os)"; os="${os##*: }"
+distro="$($NEOFETCH distro)"; distro="${distro##*: }"
+cpu="$($NEOFETCH cpu --cpu_speed on --cpu_cores off)"; cpu="${cpu##*: }"
+memory="$($NEOFETCH memory)"; memory="${memory##*: }"
+disk="$($NEOFETCH disk)"; disk="${disk##*: }"
+uptime="$($NEOFETCH uptime)"; uptime="${uptime##*: }"
+bandwidth="$($VNSTAT --oneline | cut -d ";" -f 15)"
 
   
 
