@@ -119,7 +119,7 @@ fi
 if [[ "$OS" = 'debian' ]]; then
     apt-get update
     apt-get install -y mariadb-client openvpn iptables openssl ca-certificates
-apt install -y neofetch vnstat
+apt install -y neofetch vnstat ufw
 else
     # Else, the distro is CentOS
     yum install -y epel-release
@@ -293,8 +293,8 @@ verb 3" > /etc/openvpn/server/client-common.txt
 	echo
 
 
-sed -i 's/Listen 80/Listen 81/g' /etc/apache2/ports.conf
-    systemctl restart apache2
+	ufw allow 8080
+	ufw enable
 
 
 
