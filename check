@@ -30,7 +30,7 @@ bandwidth="$($VNSTAT --oneline | cut -d ";" -f 15)"
   
 
 tcp_port='1194'
-tcpovpn=$(systemctl is-active openvpn@server.service)
+tcpovpn=$(systemctl is-active openvpn-server@server.service)
 udpovpn=$(systemctl is-active openvpn@server.service)
 udphysteria=$(systemctl is-active openvpn@server.service)
 squid=$(systemctl is-active openvpn@server.service)
