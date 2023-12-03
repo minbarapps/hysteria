@@ -16,7 +16,6 @@ VNSTAT="/usr/bin/vnstat"
 # Check if binaries exist
 if [ ! -x "$NEOFETCH" ] || [ ! -x "$VNSTAT" ]; then
     echo "Error: neofetch or vnstat not found. Make sure they are installed and in your PATH."
-    exit 1
 fi
 
 # Get system information
