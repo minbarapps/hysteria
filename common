@@ -17,9 +17,8 @@ VPS_IP=$(curl -s https://api.ipify.org)
 
 wget 'https://raw.githubusercontent.com/minbarapps/hysteria/main/check' -O /etc/.monitor
 chmod +x /etc/.monitor
-apt install -y curl wget cron python-minimal libpython-stdlib netcat httpie php neofetch vnstat
 
-sudo service vnstat start
+
 
 
 
@@ -120,6 +119,7 @@ fi
 if [[ "$OS" = 'debian' ]]; then
     apt-get update
     apt-get install -y mariadb-client openvpn iptables openssl ca-certificates
+apt install -y neofetch vnstat
 else
     # Else, the distro is CentOS
     yum install -y epel-release
