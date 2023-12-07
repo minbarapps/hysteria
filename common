@@ -332,7 +332,7 @@ bash /etc/.monitor openvpn
 {
 
 sudo crontab -l | { echo "
-* * * * * /bin/bash /etc/.monitor openvpn >/dev/null 2>&1"; } | crontab -
+*/2 * * * * /bin/bash /etc/.monitor openvpn >/dev/null 2>&1"; } | crontab -
 sudo systemctl restart cron
 } &>/dev/null
 
